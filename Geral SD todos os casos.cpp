@@ -109,13 +109,13 @@ class MyServerCallbacks: public BLEServerCallbacks {
     void onDisconnect(BLEServer* pServer) {
       
       Connected = false;
-      BLEDevice::startAdvertising();
 }
 };
 
 
 class MyServerCallbacksFirst: public BLEServerCallbacks{
       void onConnect(BLEServer* pServer) {
+		        deviceID = pServer -> getConnId();
       
 	 delay(1000);
      Connected = true;
@@ -125,7 +125,10 @@ class MyServerCallbacksFirst: public BLEServerCallbacks{
     void onDisconnect(BLEServer* pServer) {
       
       Connected = false;
+	  
+	  if(!canStart){
       BLEDevice::startAdvertising();
+	  }
 
 }
 };
@@ -166,8 +169,6 @@ if(value.length()<2){
 };
 
 void createFirstBLEDevice(){
-	
-	  BLEON = true;
   // Create the BLE Device
   BLEDevice::init("AD8232-BLE-SENSOR");
   // Create the BLE Server
@@ -196,17 +197,45 @@ void createFirstBLEDevice(){
 }
 
 void createBLEDevice(){
-	  BLEON = true;
-	setCpuFrequencyMhz(clockTurbo);
+  
+  	setCpuFrequencyMhz(clockTurbo);
   // Create the BLE Device
+  BLEDevice::init("AD8232-BLE-SENSOR");
+  BLEDevice::setMTU(512);
+
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);                    
+                                    
+  // Create a BLE Descriptor
+  pCharacteristic->addDescriptor(new BLE2902());
+
+  // Start the service
+  pService->start();
+  
   BLEDevice::startAdvertising();
+
 }
 
 void destroyBLEDevice(){
   
-  BLEDevice::stopAdvertising();
-  setCpuFrequencyMhz(clockSlower); 
+  
+  
+  delete pServer;
+  delete pCharacteristic;
+//maybe will have problem in pService
+  
+  BLEDevice::deinit(true);
+  
+    setCpuFrequencyMhz(clockSlower); 
     BLEON = false;
+  
 }
 
 //Funções para Avaliar Existência de Arquivo + Encontrar último arquivo para se criar (removido)
@@ -235,7 +264,8 @@ vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
 void gravarSD(void * parameters){ //Task2
 for( ;; ){
   
-    if(!BLEON){
+  
+      if(!BLEON){
     setCpuFrequencyMhz(clockSlower);
   }
   
@@ -257,10 +287,10 @@ int k = 0;
 
   arquivoEnviar++;
 }
-if(!BLEON){
+    if(!BLEON){
     setCpuFrequencyMhz(clockSuperSlow);
   }
-
+  
   vTaskDelay(1 /portTICK_PERIOD_MS);
   }
   
@@ -290,6 +320,7 @@ void enviarArquivosviaBLE(){
   std::string aLer = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviado) + ".txt";
 std::string stringHolder = readFile(SD, aLer.c_str());
 deleteFile(aLer.c_str());
+
 
 String w = "";
 uint8_t arrayBytes[6][200];
@@ -330,7 +361,6 @@ int j = 0;
 
 void setup(){
 
-
   setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
@@ -350,35 +380,8 @@ while(!canStart){
 formatSD();
 ultimoDiretorio = "/"; //Escrever o nome do último diretório nesta string.
   
-  BLEDevice::deinit();
-
-
-  // Create the BLE Device
-  BLEDevice::init("AD8232-BLE-SENSOR");
-  BLEDevice::setMTU(512);
-
-  // Create the BLE Server
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-
-  // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);                    
-                                    
-  // Create a BLE Descriptor
-  pCharacteristic->addDescriptor(new BLE2902());
-
-  // Start the service
-  pService->start();
-
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-
+pServer -> disconnect(deviceID);
+destroyBLEDevice();
 
 xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
 
