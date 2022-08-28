@@ -21,19 +21,20 @@ int delay_BLE_desligado = 10000; //Alterar a velocidade em que o BLE permanece d
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
 const int clockSlower = 40; //10 20 40 80 160 240
-const int clockTurbo = 240;  //80 160 240
+const int clockTurbo = 240; //80 160 240
 const int clockSuperSlow = 20; //10 20 40 80 160 240
 
+boolean BLEON = false;
+
 //Variáveis Globais
+
+uint16_t deviceID;
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
 
 boolean Connected = false;
 boolean canStart = false;
-boolean BLEON = false;
-
-BLEAdvertising *advertiser;
 
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
@@ -98,9 +99,7 @@ void writeFile(fs::FS &fs, const char * path, const char * message){ //Função 
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-
-
-      
+      deviceID = pServer -> getConnId();
       delay(1000);
      
      Connected = true;
@@ -117,8 +116,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 class MyServerCallbacksFirst: public BLEServerCallbacks{
       void onConnect(BLEServer* pServer) {
-      delay(1000);
-     
+      
+	 delay(1000);
      Connected = true;
      
      }
@@ -167,12 +166,10 @@ if(value.length()<2){
 };
 
 void createFirstBLEDevice(){
-
-  BLEON = true;
+	
+	  BLEON = true;
   // Create the BLE Device
   BLEDevice::init("AD8232-BLE-SENSOR");
-  BLEDevice::setMTU(512);
-
   // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacksFirst());
@@ -183,17 +180,8 @@ void createFirstBLEDevice(){
   // Create a BLE Characteristic
   pCharacteristic = pService->createCharacteristic(
                       CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE  |
-                      BLECharacteristic::PROPERTY_NOTIFY |
-                      BLECharacteristic::PROPERTY_INDICATE
+                      BLECharacteristic::PROPERTY_WRITE 
                     );                  
-                      
-                  
-  // Create a BLE Descriptor
-  pCharacteristic->addDescriptor(new BLE2902());
-
-
   pCharacteristic->setCallbacks(new MyCallbacks());
   // Start the service
   pService->start();
@@ -203,54 +191,22 @@ void createFirstBLEDevice(){
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->setScanResponse(false);
   pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-  advertiser = pAdvertising;
   BLEDevice::startAdvertising();
   
 }
 
 void createBLEDevice(){
-  BLEON = true;
-  setCpuFrequencyMhz(clockTurbo);
+	  BLEON = true;
+	setCpuFrequencyMhz(clockTurbo);
   // Create the BLE Device
-  BLEDevice::init("AD8232-BLE-SENSOR");
-  BLEDevice::setMTU(512);
-
-  // Create the BLE Server
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-
-  // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE  |
-                      BLECharacteristic::PROPERTY_NOTIFY |
-                      BLECharacteristic::PROPERTY_INDICATE
-                    );                    
-                                    
-  // Create a BLE Descriptor
-  pCharacteristic->addDescriptor(new BLE2902());
-
-  // Start the service
-  pService->start();
-
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-  advertiser = pAdvertising;
   BLEDevice::startAdvertising();
 }
 
 void destroyBLEDevice(){
-
-BLEDevice::deinit();
-BLEON = false;
   
+  BLEDevice::stopAdvertising();
+  setCpuFrequencyMhz(clockSlower); 
+    BLEON = false;
 }
 
 //Funções para Avaliar Existência de Arquivo + Encontrar último arquivo para se criar (removido)
@@ -279,7 +235,7 @@ vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
 void gravarSD(void * parameters){ //Task2
 for( ;; ){
   
-  if(!BLEON){
+    if(!BLEON){
     setCpuFrequencyMhz(clockSlower);
   }
   
@@ -301,8 +257,7 @@ int k = 0;
 
   arquivoEnviar++;
 }
-
-    if(!BLEON){
+if(!BLEON){
     setCpuFrequencyMhz(clockSuperSlow);
   }
 
@@ -316,29 +271,25 @@ int k = 0;
 void gerenciamentoBLE(void * parameters){ //Task3
 for( ; ;){
   if(!Connected){
-    destroyBLEDevice(); //Criar a função BLE.
+    destroyBLEDevice(); //destroy BLE Device
     delay(delay_BLE_desligado);
-    createBLEDevice();
+    createBLEDevice(); //Create BLE Device
     
     vTaskDelay(delay_BLE_ligado /portTICK_PERIOD_MS);
   }else{
 
     vTaskDelay(5 /portTICK_PERIOD_MS); //Esperar até ele se desconectar.
   }
-
-
-}
+  }
+  }
   
-}
-
-
 //Em gravarSD, dados são armazenados sempre em pacotes de 600 ints.
 //Esse valor ser definido sempre em 600 ajuda na função de envio.
 
 void enviarArquivosviaBLE(){
   std::string aLer = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviado) + ".txt";
 std::string stringHolder = readFile(SD, aLer.c_str());
-
+deleteFile(aLer.c_str());
 
 String w = "";
 uint8_t arrayBytes[6][200];
@@ -379,6 +330,8 @@ int j = 0;
 
 void setup(){
 
+
+  setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
   
@@ -397,8 +350,34 @@ while(!canStart){
 formatSD();
 ultimoDiretorio = "/"; //Escrever o nome do último diretório nesta string.
   
-destroyBLEDevice();
+  BLEDevice::deinit();
 
+
+  // Create the BLE Device
+  BLEDevice::init("AD8232-BLE-SENSOR");
+  BLEDevice::setMTU(512);
+
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  // Create the BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);                    
+                                    
+  // Create a BLE Descriptor
+  pCharacteristic->addDescriptor(new BLE2902());
+
+  // Start the service
+  pService->start();
+
+  // Start advertising
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(false);
+  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
 
 
 xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
@@ -423,7 +402,7 @@ while(arquivoEnviar - arquivoEnviado > 0){ //Enquanto ainda estiverem arquivos p
   arquivoEnviado++;
 }
 
-Connected = false; //BLEDevice vai ser destruído automaticamente pela Task 3
+pServer -> disconnect(deviceID);
 } 
   
 }
