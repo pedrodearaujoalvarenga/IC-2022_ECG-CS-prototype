@@ -17,9 +17,9 @@ int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE permanece l
 int delay_BLE_desligado = 10000; //Alterar a velocidade em que o BLE permanece desligado
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 240; //10 20 40 80 160 240
-const int clockTurbo = 240; //80 160 240
-const int clockSuperSlow = 240; //10 20 40 80 160 240
+const int clockSlower = 40; //10 20 40 80 160 240
+const int clockTurbo = 160; //80 160 240
+
 
 boolean BLEON = false;
 
@@ -196,7 +196,6 @@ void createNimBLEDevice(){
   // Create the BLE Device
   NimBLEDevice::init("AD8232-BLE-SENSOR");
   NimBLEDevice::setMTU(512);
-  NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
   // Create the BLE Server
   pServer = NimBLEDevice::createServer();
@@ -241,7 +240,7 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 //em gravarSD esse vetor é clonado e resetado, e a sua cópia é armazenada nos arquivos upload.
 
 //looperI //<- Dado coletado da ESP32.
-
+int looperI = 100;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
 int looperI;
@@ -258,10 +257,6 @@ vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
 void gravarSD(void * parameters){ //Task2
 for( ;; ){
   
-  
-      if(!BLEON){
-    setCpuFrequencyMhz(clockSlower);
-  }
   
 if(leiturasESP32.size() == 600){
   std::vector<int> copiaRAM = leiturasESP32;
@@ -282,9 +277,7 @@ int k = 0;
 
   arquivoEnviar++;
 }
-    if(!BLEON){
-    setCpuFrequencyMhz(clockSuperSlow);
-  }
+
   
   vTaskDelay(1 /portTICK_PERIOD_MS);
   }
@@ -314,6 +307,7 @@ for( ; ;){
 void enviarArquivosviaBLE(){
   std::string aLer = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviado) + ".txt";
 std::string stringHolder = readFile(SD, aLer.c_str());
+Serial.println(stringHolder.c_str());
 deleteFile(aLer.c_str());
 
 
@@ -350,7 +344,6 @@ int j = 0;
       pCharacteristic->setValue(arrayBytes[j], 200);
       pCharacteristic->notify();
       j++;
-      delay(6);
     }
 }
 
@@ -371,7 +364,6 @@ createFirstNimBLEDevice();
 
 while(!canStart){
   delay(1000);
-  Serial.println("Poggers");
   } //loopar notConnected
   
 formatSD();
@@ -383,7 +375,7 @@ xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR 
 
 xTaskCreate(gravarSD, "Task 2", 5000, NULL, 1, NULL);  //Postar TASK 2 - GRAVAR CARTÃO SD
 
-xTaskCreate(gerenciamentoBLE, "Task 3", 4000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
+xTaskCreate(gerenciamentoBLE, "Task 3", 8000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
 
 }
 
@@ -391,6 +383,8 @@ void loop(){
 
 
 if(Connected){
+
+  Serial.println(ESP.getFreeHeap());
 
 while(arquivoEnviar - arquivoEnviado > 0){ //Enquanto ainda estiverem arquivos para serem enviados
 
@@ -401,8 +395,8 @@ while(arquivoEnviar - arquivoEnviado > 0){ //Enquanto ainda estiverem arquivos p
   Serial.println("Arquivo Enviado");
   Serial.println(arquivoEnviado);
   arquivoEnviado++;
+  delay(150);
 }
-delay(25);
 Connected = false;
 
 } 
