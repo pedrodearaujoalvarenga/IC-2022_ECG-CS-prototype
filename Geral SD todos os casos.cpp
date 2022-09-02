@@ -1,10 +1,7 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <NimBLEDevice.h>
 
 #include <WiFi.h>
 #include <BluetoothSerial.h>
@@ -28,10 +25,9 @@ boolean BLEON = false;
 
 //Variáveis Globais
 
-uint16_t deviceID;
-
-BLEServer* pServer = NULL;
-BLECharacteristic* pCharacteristic = NULL;
+NimBLEServer* pServer = NULL;
+NimBLECharacteristic* pCharacteristic = NULL;
+NimBLEService *pService = NULL;
 
 boolean Connected = false;
 boolean canStart = false;
@@ -97,44 +93,44 @@ void writeFile(fs::FS &fs, const char * path, const char * message){ //Função 
 
 //Funções do BLE
 
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      deviceID = pServer -> getConnId();
-      delay(1000);
-     
+class MyServerCallbacks: public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* pServer) {
+      delay(2000);
+           Serial.println("Connected");
      Connected = true;
      
-     }
+     };
 
-    void onDisconnect(BLEServer* pServer) {
-      
+    void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
+                  Serial.println("Disconnected");
+
       Connected = false;
-}
+};
 };
 
 
-class MyServerCallbacksFirst: public BLEServerCallbacks{
-      void onConnect(BLEServer* pServer) {
-		        deviceID = pServer -> getConnId();
-      
-	 delay(1000);
+class MyServerCallbacksFirst: public NimBLEServerCallbacks{
+      void onConnect(NimBLEServer* pServer) {
+      Serial.println("Connected");
+   delay(1000);
      Connected = true;
      
-     }
+     };
 
-    void onDisconnect(BLEServer* pServer) {
-      
+    void onDisconnect(NimBLEServer* pServer) {
+            Serial.println("Disconnected");
+
       Connected = false;
-	  
-	  if(!canStart){
-      BLEDevice::startAdvertising();
-	  }
+    
+    if(!canStart){
+      NimBLEDevice::startAdvertising();
+    }
 
-}
+};
 };
 
-class MyCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
+class MyCallbacks: public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
 if(value.length()<2){
   canStart = true;
@@ -168,70 +164,62 @@ if(value.length()<2){
     }
 };
 
-void createFirstBLEDevice(){
+void createFirstNimBLEDevice(){
   // Create the BLE Device
-  BLEDevice::init("AD8232-BLE-SENSOR");
+  NimBLEDevice::init("AD8232-BLE-SENSOR");
   // Create the BLE Server
-  pServer = BLEDevice::createServer();
+  pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacksFirst());
 
   // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+  pService = pServer->createService(SERVICE_UUID);
 
   // Create a BLE Characteristic
   pCharacteristic = pService->createCharacteristic(
                       CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_WRITE 
+                      NIMBLE_PROPERTY::WRITE 
                     );                  
   pCharacteristic->setCallbacks(new MyCallbacks());
   // Start the service
   pService->start();
+    NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(pService->getUUID());
+    pAdvertising->setScanResponse(true);
+    pAdvertising->start();
 
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(false);
-  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-  BLEDevice::startAdvertising();
+    
   
 }
 
-void createBLEDevice(){
+void createNimBLEDevice(){
   
-  	setCpuFrequencyMhz(clockTurbo);
+    setCpuFrequencyMhz(clockTurbo);
   // Create the BLE Device
-  BLEDevice::init("AD8232-BLE-SENSOR");
-  BLEDevice::setMTU(512);
+  NimBLEDevice::init("AD8232-BLE-SENSOR");
+  NimBLEDevice::setMTU(512);
 
   // Create the BLE Server
-  pServer = BLEDevice::createServer();
+  pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
+  pService = pServer->createService(SERVICE_UUID);
 
   // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, BLECharacteristic::PROPERTY_NOTIFY);                    
+  pCharacteristic = pService->createCharacteristic(CHARACTERISTIC_UUID, NIMBLE_PROPERTY::NOTIFY);                    
                                     
-  // Create a BLE Descriptor
-  pCharacteristic->addDescriptor(new BLE2902());
+  
 
   // Start the service
-  pService->start();
-  
-  BLEDevice::startAdvertising();
+  pService->start(); 
+  NimBLEDevice::startAdvertising();
 
 }
 
-void destroyBLEDevice(){
+void destroyNimBLEDevice(){
+
   
-  
-  
-  delete pServer;
-  delete pCharacteristic;
-//maybe will have problem in pService
-  
-  BLEDevice::deinit(true);
+
   
     setCpuFrequencyMhz(clockSlower); 
     BLEON = false;
@@ -247,15 +235,10 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 //em gravarSD esse vetor é clonado e resetado, e a sua cópia é armazenada nos arquivos upload.
 
 //looperI //<- Dado coletado da ESP32.
-
+int looperI = 0;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
-int looperI;
-if(digitalRead(40) == 1 || digitalRead(41) == 1){
-  looperI = 0;
-}else{
-  looperI = analogRead(15);
-}
+looperI++;
 leiturasESP32.push_back(looperI);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
   }
@@ -282,7 +265,8 @@ int k = 0;
 }
 
   std::string nomedoArquivo = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviar) + ".txt";
-
+  Serial.println("Arquivo a enviar:");
+  Serial.println(arquivoEnviar);
   writeFile(SD, nomedoArquivo.c_str(), textoFinal.c_str());
 
   arquivoEnviar++;
@@ -301,9 +285,9 @@ int k = 0;
 void gerenciamentoBLE(void * parameters){ //Task3
 for( ; ;){
   if(!Connected){
-    destroyBLEDevice(); //destroy BLE Device
+    destroyNimBLEDevice(); //destroy BLE Device
     delay(delay_BLE_desligado);
-    createBLEDevice(); //Create BLE Device
+    createNimBLEDevice(); //Create BLE Device
     
     vTaskDelay(delay_BLE_ligado /portTICK_PERIOD_MS);
   }else{
@@ -355,12 +339,12 @@ int j = 0;
       pCharacteristic->setValue(arrayBytes[j], 200);
       pCharacteristic->notify();
       j++;
-      delay(3);
     }
 }
 
 void setup(){
 
+Serial.begin(115200);
   setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
@@ -371,23 +355,24 @@ void setup(){
 
     delay(100);
   }
-createFirstBLEDevice();
+createFirstNimBLEDevice();
 
 while(!canStart){
   delay(1000);
   } //loopar notConnected
-  
+
+
 formatSD();
+  BLEDevice::deinit(true);
 ultimoDiretorio = "/"; //Escrever o nome do último diretório nesta string.
   
-pServer -> disconnect(deviceID);
-destroyBLEDevice();
+destroyNimBLEDevice();
 
 xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
 
-xTaskCreate(gravarSD, "Task 2", 5000, NULL, 1, NULL);  //Postar TASK 2 - GRAVAR CARTÃO SD
+xTaskCreate(gravarSD, "Task 2", 8000, NULL, 1, NULL);  //Postar TASK 2 - GRAVAR CARTÃO SD
 
-xTaskCreate(gerenciamentoBLE, "Task 3", 4000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
+xTaskCreate(gerenciamentoBLE, "Task 3", 8000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
 
 }
 
@@ -396,16 +381,21 @@ void loop(){
 
 if(Connected){
 
+
+
 while(arquivoEnviar - arquivoEnviado > 0){ //Enquanto ainda estiverem arquivos para serem enviados
 
   if(!Connected){
     ESP.restart();
   }
   enviarArquivosviaBLE();
+  Serial.println("Arquivo Enviado");
+  Serial.println(arquivoEnviado);
   arquivoEnviado++;
+  delay(20);
 }
 
-pServer -> disconnect(deviceID);
+
 } 
   
 }

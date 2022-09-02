@@ -17,9 +17,9 @@ int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE permanece l
 int delay_BLE_desligado = 10000; //Alterar a velocidade em que o BLE permanece desligado
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 40; //10 20 40 80 160 240
-const int clockTurbo = 160; //80 160 240
-
+const int clockSlower = 240; //10 20 40 80 160 240
+const int clockTurbo = 240; //80 160 240
+const int clockSuperSlow = 240; //10 20 40 80 160 240
 
 boolean BLEON = false;
 
@@ -45,50 +45,6 @@ std::string ultimoDiretorio; //String global que contém o nome da pasta (leitur
 //Funções de MicroSD Principais
 
 
-void deleteFile(const char * path){
-  SD.remove(path);
-}
-
-void formatSD(){
-
-  File root = SD.open("/");
-    File file = root.openNextFile();
-  while(file){
-  deleteFile(file.path());
-    file = root.openNextFile();
-  }
-}
-
-
-std::string readFile(fs::FS &fs, const char * path){ //Função que lê arquivo
-  std::string respostaLeitura = "";
-
-  File file = fs.open(path);
-  if(!file){
-    return "";
-  }
-
-  while(file.available()){
-    respostaLeitura += (char)file.read();
- 
-  }
-
-  
-  file.close();
-  return respostaLeitura;
-}
-
-void writeFile(fs::FS &fs, const char * path, const char * message){ //Função que cria arquivo
-
-  File file = fs.open(path, FILE_WRITE);
-  if(!file){
-    return;
-  }
-  if(file.print(message)){
-  } else {
-  }
-  file.close();
-}
 
 //Funções do BLE
 
@@ -243,48 +199,14 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 int looperI = 100;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
-int looperI;
-if(digitalRead(40) == 1 || digitalRead(41) == 1){
-  looperI = 0;
-}else{
-  looperI = analogRead(15);
-}
+looperI++;
 leiturasESP32.push_back(looperI);
+if(looperI == 999){
+  looperI = 100;
+}
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
   }
 }
-
-void gravarSD(void * parameters){ //Task2
-for( ;; ){
-  
-  
-if(leiturasESP32.size() == 600){
-  std::vector<int> copiaRAM = leiturasESP32;
-  leiturasESP32.clear();
-  std::string textoFinal = "";
-int k = 0;
-  for (auto it = copiaRAM.begin(); k<600; k++){
-
-  textoFinal += std::to_string(*it) + ",";
-  copiaRAM.erase(copiaRAM.begin());
-  
-}
-
-  std::string nomedoArquivo = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviar) + ".txt";
-  Serial.println("Arquivo a enviar:");
-  Serial.println(arquivoEnviar);
-  writeFile(SD, nomedoArquivo.c_str(), textoFinal.c_str());
-
-  arquivoEnviar++;
-}
-
-  
-  vTaskDelay(1 /portTICK_PERIOD_MS);
-  }
-  
-}
-
-
 
 void gerenciamentoBLE(void * parameters){ //Task3
 for( ; ;){
@@ -304,49 +226,6 @@ for( ; ;){
 //Em gravarSD, dados são armazenados sempre em pacotes de 600 ints.
 //Esse valor ser definido sempre em 600 ajuda na função de envio.
 
-void enviarArquivosviaBLE(){
-  std::string aLer = ultimoDiretorio + "/upload" + std::to_string(arquivoEnviado) + ".txt";
-std::string stringHolder = readFile(SD, aLer.c_str());
-Serial.println(stringHolder.c_str());
-deleteFile(aLer.c_str());
-
-
-String w = "";
-uint8_t arrayBytes[6][200];
-int i = 0;
-int j = 0;
-
-    for (auto x : stringHolder)
-    {
-        if (x == ',')
-        {
-
-           arrayBytes[j][i] = (uint8_t)(atoi(w.c_str()) & 0x00FF);
-           i++;
-           arrayBytes[j][i] = (uint8_t)((atoi(w.c_str()) & 0xFF00) >> 8);
-           i++;
-            
-          if(i == 200){
-            i = 0;
-            j++;
-          }
-            w = "";
-            
-        }
-        else {
-            w = w + x;
-        }
-    }
-    i = 0;
-    j = 0;
-
-    while(j<6){
-      pCharacteristic->setValue(arrayBytes[j], 200);
-      pCharacteristic->notify();
-      j++;
-    }
-}
-
 void setup(){
 
 Serial.begin(115200);
@@ -356,24 +235,16 @@ Serial.begin(115200);
   
   pinMode(41, INPUT);
   pinMode(40, INPUT);
-  while(!SD.begin(5)){ //Esperar para o cartão estar funcionando apropriadamente.
-
-    delay(100);
-  }
+  
 createFirstNimBLEDevice();
 
 while(!canStart){
   delay(1000);
   } //loopar notConnected
   
-formatSD();
-ultimoDiretorio = "/"; //Escrever o nome do último diretório nesta string.
-  
 destroyNimBLEDevice();
 
 xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
-
-xTaskCreate(gravarSD, "Task 2", 5000, NULL, 1, NULL);  //Postar TASK 2 - GRAVAR CARTÃO SD
 
 xTaskCreate(gerenciamentoBLE, "Task 3", 8000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
 
@@ -384,18 +255,25 @@ void loop(){
 
 if(Connected){
 
-  Serial.println(ESP.getFreeHeap());
-
-while(arquivoEnviar - arquivoEnviado > 0){ //Enquanto ainda estiverem arquivos para serem enviados
+while(leiturasESP32.size() > 300){ //Enquanto ainda estiverem arquivos para serem enviados
 
   if(!Connected){
     ESP.restart();
   }
-  enviarArquivosviaBLE();
-  Serial.println("Arquivo Enviado");
-  Serial.println(arquivoEnviado);
-  arquivoEnviado++;
-  delay(150);
+uint8_t arrayBytes[200];
+int i = 0;
+while(i<200){
+  int toCopy = leiturasESP32.front();
+arrayBytes[i] = (uint8_t)(toCopy & 0x00FF);
+i++;
+arrayBytes[i] = (uint8_t)((toCopy & 0xFF00) >> 8);
+leiturasESP32.erase(leiturasESP32.begin());
+i++;
+}
+
+      pCharacteristic->setValue(arrayBytes, 200);
+      pCharacteristic->notify();
+    delay(3);
 }
 Connected = false;
 
