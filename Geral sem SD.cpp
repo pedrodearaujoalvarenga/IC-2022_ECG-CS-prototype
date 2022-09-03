@@ -17,9 +17,9 @@ int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE permanece l
 int delay_BLE_desligado = 10000; //Alterar a velocidade em que o BLE permanece desligado
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 240; //10 20 40 80 160 240
+const int clockSlower = 10; //10 20 40 80 160 240
 const int clockTurbo = 240; //80 160 240
-const int clockSuperSlow = 240; //10 20 40 80 160 240
+const int clockSuperSlow = 10; //10 20 40 80 160 240
 
 boolean BLEON = false;
 
@@ -30,6 +30,7 @@ NimBLECharacteristic* pCharacteristic = NULL;
 
 boolean Connected = false;
 boolean canStart = false;
+boolean firstTime = true;
 
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
@@ -50,7 +51,6 @@ std::string ultimoDiretorio; //String global que contém o nome da pasta (leitur
 
 class MyServerCallbacks: public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer) {
-      delay(2000);
            Serial.println("Connected");
      Connected = true;
      
@@ -58,7 +58,7 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 
     void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
                   Serial.println("Disconnected");
-
+      firstTime = true;
       Connected = false;
 };
 };
@@ -121,7 +121,7 @@ if(value.length()<2){
 
 void createFirstNimBLEDevice(){
   // Create the BLE Device
-  NimBLEDevice::init("AD8232-BLE-SENSOR");
+  NimBLEDevice::init("AD8232");
   // Create the BLE Server
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacksFirst());
@@ -150,7 +150,7 @@ void createNimBLEDevice(){
   
     setCpuFrequencyMhz(clockTurbo);
   // Create the BLE Device
-  NimBLEDevice::init("AD8232-BLE-SENSOR");
+  NimBLEDevice::init("AD8232");
   NimBLEDevice::setMTU(512);
 
   // Create the BLE Server
@@ -196,14 +196,11 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 //em gravarSD esse vetor é clonado e resetado, e a sua cópia é armazenada nos arquivos upload.
 
 //looperI //<- Dado coletado da ESP32.
-int looperI = 100;
+int looperI = 0;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
 looperI++;
-leiturasESP32.push_back(looperI);
-if(looperI == 999){
-  looperI = 100;
-}
+leiturasESP32.insert(leiturasESP32.begin(), looperI);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
   }
 }
@@ -254,27 +251,36 @@ void loop(){
 
 
 if(Connected){
+  if(firstTime){
+      delay(2000);
+      firstTime = false;
+    
+  }
 
-while(leiturasESP32.size() > 300){ //Enquanto ainda estiverem arquivos para serem enviados
+while(leiturasESP32.size() >= 100){ //Enquanto ainda estiverem arquivos para serem enviados
 
   if(!Connected){
     ESP.restart();
   }
 uint8_t arrayBytes[200];
 int i = 0;
+Serial.print("Sending vector with start: ");
+Serial.println(leiturasESP32.back());
 while(i<200){
-  int toCopy = leiturasESP32.front();
+
+  int toCopy = leiturasESP32.back();
 arrayBytes[i] = (uint8_t)(toCopy & 0x00FF);
 i++;
 arrayBytes[i] = (uint8_t)((toCopy & 0xFF00) >> 8);
-leiturasESP32.erase(leiturasESP32.begin());
+leiturasESP32.pop_back();
 i++;
 }
 
       pCharacteristic->setValue(arrayBytes, 200);
       pCharacteristic->notify();
-    delay(3);
+    delay(10);
 }
+firstTime = true;
 Connected = false;
 
 } 
