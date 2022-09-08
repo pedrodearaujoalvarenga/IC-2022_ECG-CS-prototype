@@ -200,7 +200,7 @@ int looperI = 0;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
 looperI++;
-leiturasESP32.insert(leiturasESP32.begin(), looperI);
+leiturasESP32.push_back(looperI);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
   }
 }
@@ -257,29 +257,52 @@ if(Connected){
     
   }
 
-while(leiturasESP32.size() >= 100){ //Enquanto ainda estiverem arquivos para serem enviados
+
+
+while(leiturasESP32.size() >= 100){
+
+int arr[100];
+std::copy(leiturasESP32.begin(), leiturasESP32.begin()+100, arr);
+leiturasESP32.erase(leiturasESP32.begin(), leiturasESP32.begin() +100);
+
+	//Enquanto ainda estiverem arquivos para serem enviados
 
   if(!Connected){
     ESP.restart();
   }
 uint8_t arrayBytes[200];
 int i = 0;
-Serial.print("Sending vector with start: ");
-Serial.println(leiturasESP32.back());
+
+
+
+int j = 0;
 while(i<200){
 
-  int toCopy = leiturasESP32.back();
-arrayBytes[i] = (uint8_t)(toCopy & 0x00FF);
+arrayBytes[i] = (uint8_t)(arr[j] & 0x00FF);
 i++;
-arrayBytes[i] = (uint8_t)((toCopy & 0xFF00) >> 8);
-leiturasESP32.pop_back();
+arrayBytes[i] = (uint8_t)((arr[j] & 0xFF00) >> 8);
 i++;
+
+j++;
 }
+
+
 
       pCharacteristic->setValue(arrayBytes, 200);
       pCharacteristic->notify();
     delay(10);
+	
+	
+	
+	
 }
+
+
+
+
+
+
+
 firstTime = true;
 Connected = false;
 
