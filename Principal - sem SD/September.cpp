@@ -18,7 +18,7 @@ const int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE perma
 const int delay_BLE_desligado = 30000; //Alterar a velocidade em que o BLE permanece desligado
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 80; //10 20 40 80 160 240
+const int clockSlower = 20; //10 20 40 80 160 240
 const int clockTurbo = 240; //80 160 240
 
 boolean compressedSensing = false;
@@ -231,12 +231,17 @@ for( ; ;){
 
 void setup(){
 
+  digitalWrite(LED_BUILTIN, HIGH);
+
 Serial.begin(115200);
+Serial.println("Vivo");
+ Serial.println(ESP.getFreeHeap());
   setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
   
   pinMode(41, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(40, INPUT);
   
 createFirstNimBLEDevice();
@@ -249,17 +254,33 @@ destroyNimBLEDevice();
 
 wasConnected = true;
 
-xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
+xTaskCreate(gerarDados, "Task 1", 4000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
 
-xTaskCreate(gerenciamentoBLE, "Task 3", 8000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
 
 }
 
+boolean canConnect = false;
+
 void loop(){
 
-
-if(Connected){
+if(!canConnect){
+    destroyNimBLEDevice(); //destroy BLE Device
+    delay(delay_BLE_desligado);
+    createNimBLEDevice(); //Create BLE Device
+  canConnect = true;
   
+  
+}
+if(canConnect){
+  int i = 0;
+  
+  while(i<delay_BLE_ligado){
+  
+if(Connected){
+  digitalWrite(LED_BUILTIN, HIGH);
+  Serial.begin(115200);
+  Serial.println("Conectado");
+   Serial.println(ESP.getFreeHeap());
   
   if(firstTime){
       delay(2000);
@@ -278,8 +299,6 @@ leiturasESP32.erase(leiturasESP32.begin(), leiturasESP32.begin() + 100);
   }
 uint8_t arrayBytes[200];
 int i = 0;
-Serial.print("Sending vector with start: ");
-Serial.println(arr[0]);
 int j = 0;
 while(i<200){
 
@@ -297,7 +316,23 @@ j++;
 }
 firstTime = true;
 Connected = false;
+canConnect = false;
+digitalWrite(LED_BUILTIN, LOW);
+  break;
 
 } 
+
+delay(1);
+i++;
+
+}
+
+
+if(canConnect){
+      ESP.restart();
+}
+
+
+}
   
 }
