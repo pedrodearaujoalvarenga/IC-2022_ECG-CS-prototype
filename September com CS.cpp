@@ -15,10 +15,10 @@
 //Definições para o usuário
 
 const int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE permanece ligado
-const int delay_BLE_desligado = 10000; //Alterar a velocidade em que o BLE permanece desligado
+const int delay_BLE_desligado = 30000; //Alterar a velocidade em que o BLE permanece desligado
 int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 80; //10 20 40 80 160 240
+const int clockSlower = 20; //10 20 40 80 160 240
 const int clockTurbo = 240; //80 160 240
 
 boolean compressedSensing = false;
@@ -33,16 +33,10 @@ boolean Connected = false;
 boolean canStart = false;
 boolean firstTime = true;
 
+boolean wasConnected = true;
+
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
-
-int arquivoEnviar = 0; //int que sinaliza arquivos criados pela ESP
-int arquivoEnviado = 0; //int que sinaliza arquivos enviados pela ESP
-//naturalmente, os que faltam enviar é a diferença dos dois.
-
-std::string ultimoDiretorio; //String global que contém o nome da pasta (leituraN).
-//Em SETUP, a ESP32 lê o cartão SD e identifica qual a última pasta do tipo "leitura" existente, e então adiciona um número na frente.
 
 //Funções de MicroSD Principais
 
@@ -54,6 +48,7 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer) {
            Serial.println("Connected");
      Connected = true;
+     wasConnected = true;
      
      };
 
@@ -70,7 +65,7 @@ class MyServerCallbacksFirst: public NimBLEServerCallbacks{
       Serial.println("Connected");
    delay(1000);
      Connected = true;
-     
+     wasConnected = true;
      };
 
     void onDisconnect(NimBLEServer* pServer) {
@@ -112,14 +107,14 @@ if(value.length()<2){
     }
     valoresColetadosdaSequencia[h] = atoi(w.c_str());
     delay_geracao_Dados =  valoresColetadosdaSequencia[0];
-	
-	if(valoresColetadosdaSequencia[1] == 0){
-		
-		compressedSensing = false;
-	}else{
-		compressedSensing = true;
-		compressedRatio = valoresColetadordaSequencia[2];
-	}
+  
+  if(valoresColetadosdaSequencia[1] == 0){
+    
+    compressedSensing = false;
+  }else{
+    compressedSensing = true;
+    compressedRatio = valoresColetadosdaSequencia[2];
+  }
 
      canStart = true;
     }
@@ -187,6 +182,11 @@ void createNimBLEDevice(){
 void destroyNimBLEDevice(){
   
   NimBLEDevice::deinit(true);
+  if(wasConnected){
+    wasConnected = false;
+  }else{
+    ESP.restart();
+  }
   
     setCpuFrequencyMhz(clockSlower); 
   
@@ -204,11 +204,25 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 int looperI = 0;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
-
-
+    
  looperI++;
 leiturasESP32.push_back(looperI);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
+  }
+}
+
+std::vector<int> vetorjaComprimido;
+
+void comprimirDados(void * parameters){ //Task1
+  for( ;; ){
+ if(leiturasESP32.size()>=1024){
+	 
+
+
+ }else{
+vTaskDelay(50 /portTICK_PERIOD_MS);
+ }	 
+ 
   }
 }
 
@@ -232,12 +246,17 @@ for( ; ;){
 
 void setup(){
 
+  digitalWrite(LED_BUILTIN, HIGH);
+
 Serial.begin(115200);
+Serial.println("Vivo");
+ Serial.println(ESP.getFreeHeap());
   setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
   
   pinMode(41, INPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(40, INPUT);
   
 createFirstNimBLEDevice();
@@ -248,23 +267,35 @@ while(!canStart){
   
 destroyNimBLEDevice();
 
-xTaskCreate(gerarDados, "Task 1", 2000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
+wasConnected = true;
 
-xTaskCreate(gerenciamentoBLE, "Task 3", 8000, NULL, 1, NULL);  //Postar TASK 3 - LIGAR E DESLIGAR BLE
+xTaskCreate(gerarDados, "Task 1", 4000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
+
 
 }
 
-std::vector<int> leiturasESP32CopiaeResto;
+boolean canConnect = false;
 
 void loop(){
 
-
-if(Connected){
+if(!canConnect){
+    destroyNimBLEDevice(); //destroy BLE Device
+    delay(delay_BLE_desligado);
+    createNimBLEDevice(); //Create BLE Device
+  canConnect = true;
   
-    std::vector<int> copiaRodada = leiturasESP32;  //Copiar vetor antigo para a memória
-  leiturasESP32.clear(); //Limpar vetor antigo
-  std::reverse(copiaRodada.begin(), copiaRodada.end()); //Inverter a cópia da memória
-  leiturasESP32CopiaeResto.insert(leiturasESP32CopiaeResto.end(), copiaRodada.begin(), copiaRodada.end()); //Inserir com o "desperdício"
+  
+}
+if(canConnect){
+  int i = 0;
+  
+  while(i<delay_BLE_ligado){
+  
+if(Connected){
+  digitalWrite(LED_BUILTIN, HIGH);
+  Serial.begin(115200);
+  Serial.println("Conectado");
+   Serial.println(ESP.getFreeHeap());
   
   if(firstTime){
       delay(2000);
@@ -272,23 +303,26 @@ if(Connected){
     
   }
 
-while(leiturasESP32CopiaeResto.size() >= 100){ //Enquanto ainda estiverem arquivos para serem enviados
+while(leiturasESP32.size() >= 100){ //Enquanto ainda estiverem arquivos para serem enviados
+
+int arr[100];
+std::copy(leiturasESP32.begin(), leiturasESP32.begin() + 100, arr);
+leiturasESP32.erase(leiturasESP32.begin(), leiturasESP32.begin() + 100);
 
   if(!Connected){
     ESP.restart();
   }
 uint8_t arrayBytes[200];
 int i = 0;
-Serial.print("Sending vector with start: ");
-Serial.println(leiturasESP32CopiaeResto.back());
+int j = 0;
 while(i<200){
 
-  int toCopy = leiturasESP32CopiaeResto.back();
-arrayBytes[i] = (uint8_t)(toCopy & 0x00FF);
+
+arrayBytes[i] = (uint8_t)(arr[j] & 0x00FF);
 i++;
-arrayBytes[i] = (uint8_t)((toCopy & 0xFF00) >> 8);
-leiturasESP32CopiaeResto.pop_back();
+arrayBytes[i] = (uint8_t)((arr[j] & 0xFF00) >> 8);
 i++;
+j++;
 }
 
       pCharacteristic->setValue(arrayBytes, 200);
@@ -297,7 +331,23 @@ i++;
 }
 firstTime = true;
 Connected = false;
+canConnect = false;
+digitalWrite(LED_BUILTIN, LOW);
+  break;
 
 } 
+
+delay(1);
+i++;
+
+}
+
+
+if(canConnect){
+      ESP.restart();
+}
+
+
+}
   
 }
