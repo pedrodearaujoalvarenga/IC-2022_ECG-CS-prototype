@@ -7,29 +7,10 @@ import scipy.fftpack as spfft
 import scipy.ndimage as spimg
 import cvxpy as cvx
 
-# generate some data with noise
-x = np.sort(np.random.uniform(0, 10, 15))
-y = 3 + 0.2 * x + 0.1 * np.random.randn(len(x))
-
-# find L1 line fit
-l1_fit = lambda x0, x, y: np.sum(np.abs(x0[0] * x + x0[1] - y))
-xopt1 = spopt.fmin(func=l1_fit, x0=[1, 1], args=(x, y))
-
-# find L2 line fit
-l2_fit = lambda x0, x, y: np.sum(np.power(x0[0] * x + x0[1] - y, 2))
-xopt2 = spopt.fmin(func=l2_fit, x0=[1, 1], args=(x, y))
-
-y2 = y.copy()
-y2[3] += 4
-y2[13] -= 3
-
-# refit the lines
-xopt12 = spopt.fmin(func=l1_fit, x0=[1, 1], args=(x, y2))
-xopt22 = spopt.fmin(func=l2_fit, x0=[1, 1], args=(x, y2))
-
 # sum of two sinusoids
-n = 1024
-t = np.linspace(0, 1/8, n)
+
+compressedRatio = 20 #em %
+
 y = [-0.140000000000000,
 -0.140000000000000,
 -0.140000000000000,
@@ -1055,13 +1036,17 @@ y = [-0.140000000000000,
 -0.115000000000000,
 -0.120000000000000]
 
+n = len(y)
+t = np.linspace(0, 1/8, n)
+
+
 yt = spfft.dct(y, norm='ortho')
 
 
-plt.plot(y, color = "blue")
+plt.plot(y, color = "blue", linewidth=1, label = "Sinal original")
 
 # extract small sample of signal
-m = 512 # 10% sample
+m = int((100-compressedRatio)*n/100)
 ri = np.random.choice(n, m, replace=False) # random sample of indices
 
 
@@ -1088,7 +1073,8 @@ x = np.array(vx.value)
 x = np.squeeze(x)
 sig = spfft.idct(x, norm='ortho', axis=0)
 
-plt.plot(sig, color = "red")
-plt.plot(sig-y, color ="green")
+plt.plot(sig, color = "red", linewidth=1, label="Sinal Reconstruído")
+plt.plot(y-sig, color ="green", linewidth=0.8, label="Diferença entre os sinais")
+plt.legend(loc="upper right")
 
 plt.show()
