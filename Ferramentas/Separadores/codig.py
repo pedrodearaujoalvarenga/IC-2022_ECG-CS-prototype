@@ -12,14 +12,13 @@ with open("array.txt") as f:
 
         for c in line:
 
-            if c == "	":
+            if c == " ":
                 a.write(",")
     
             else:
                 if c == "\n":
-                 a.write(",")
-                 a.write("\n")
-                
+                 a.write(c)
+
                 else:
                  a.write(c)    
                 

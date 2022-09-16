@@ -7,9 +7,11 @@ import scipy.fftpack as spfft
 import scipy.ndimage as spimg
 import cvxpy as cvx
 
+import os
+
 # sum of two sinusoids
 
-compressedRatio = 20 #em %
+compressedRatio = 50 #em %
 
 y = [-0.140000000000000,
 -0.140000000000000,
@@ -1055,6 +1057,8 @@ ri = np.random.choice(n, m, replace=False) # random sample of indices
 ri.sort() # sorting not strictly necessary, but convenient for plotting
 t2 = t[ri]
 y2 = np.array(y)[ri]
+
+print(repr(y2))
 
 
 # create idct matrix operator
