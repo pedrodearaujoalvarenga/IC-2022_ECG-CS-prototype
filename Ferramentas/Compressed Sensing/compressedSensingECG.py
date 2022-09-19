@@ -1,5 +1,7 @@
 from re import X
+from typing import Concatenate
 import numpy as np
+import numpy.linalg as lnag
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import scipy.optimize as spopt
@@ -11,7 +13,7 @@ import os
 
 # sum of two sinusoids
 
-compressedRatio = 50 #em %
+compressedRatio = 5 #em %
 
 y = [-0.140000000000000,
 -0.140000000000000,
@@ -1038,6 +1040,10 @@ y = [-0.140000000000000,
 -0.115000000000000,
 -0.120000000000000]
 
+y = np.array(y)
+
+print(len(y))
+
 n = len(y)
 t = np.linspace(0, 1/8, n)
 
@@ -1056,7 +1062,7 @@ ri = np.random.choice(n, m, replace=False) # random sample of indices
 
 ri.sort() # sorting not strictly necessary, but convenient for plotting
 t2 = t[ri]
-y2 = np.array(y)[ri]
+y2 = y[ri]
 
 print(repr(y2))
 
@@ -1077,8 +1083,14 @@ x = np.array(vx.value)
 x = np.squeeze(x)
 sig = spfft.idct(x, norm='ortho', axis=0)
 
+#getPRD
+
+PRD = lnag.norm(y-sig)/lnag.norm(y)*100
+title = "PRD: "+ PRD.astype('str') + "%"
+
 plt.plot(sig, color = "red", linewidth=1, label="Sinal Reconstruído")
 plt.plot(y-sig, color ="green", linewidth=0.8, label="Diferença entre os sinais")
 plt.legend(loc="upper right")
+plt.title(title)
 
 plt.show()

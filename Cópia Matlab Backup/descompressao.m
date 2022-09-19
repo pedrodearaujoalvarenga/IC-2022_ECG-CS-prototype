@@ -1,5 +1,7 @@
 clear all,close all, clc;
-                             
+
+
+
 N=1024;   
 load('Bernoulli.mat'); % ajuste CR entre 1 a 19 para ajustar a taxa de compress?o
 
@@ -47,5 +49,5 @@ set(legend('$\ {x(t)}$ ','$\hat{x}(t)$','Differenca'),'Interpreter','Latex','Fon
 set(gca,'xlim',[0 1024])
 xlabel('Samples');
 ylabel('Volts');
-wav = 'db2'
+wav = 'db2';
 suptitle(['Wavelet ' wav,'......', ' CR ',num2str(round(M/N*100,0)),'% ','......',' PRD ',num2str(round(PRD,1))] );

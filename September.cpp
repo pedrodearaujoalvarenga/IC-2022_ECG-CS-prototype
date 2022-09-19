@@ -21,8 +21,9 @@ int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são ge
 const int clockSlower = 20; //10 20 40 80 160 240
 const int clockTurbo = 240; //80 160 240
 
-boolean compressedSensing = false;
-int compressedRatio;
+bool compressedSensing = false;
+int compressedRatio; //Varia de 0 a 20. Escolhido dessa forma pois permite porcentagens de 5 em 5. (5%, 10%, etc) 
+int probabilidadedeSerGerado; //= 20-compressedRatio
 
 //Variáveis Globais
 
@@ -114,6 +115,11 @@ if(value.length()<2){
   }else{
     compressedSensing = true;
     compressedRatio = valoresColetadosdaSequencia[2];
+    probabilidadedeSerGerado = 20 - compressedRatio;
+    
+    Serial.println("Compressed Sensing habilitado, valores:");
+    Serial.println(compressedRatio);
+    Serial.println(probabilidadedeSerGerado);
   }
 
      canStart = true;
@@ -226,6 +232,29 @@ for( ; ;){
   }
   }
   
+
+
+void gerarDadoscomCS(void* parameters){
+for(; ;){
+    
+
+    if(rand()%20 < probabilidadedeSerGerado){
+       looperI++;
+leiturasESP32.push_back(looperI);
+vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
+    }else{
+		looperI++;
+		vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
+	}
+
+  
+
+
+
+}
+
+
+}  
 //Em gravarSD, dados são armazenados sempre em pacotes de 600 ints.
 //Esse valor ser definido sempre em 600 ajuda na função de envio.
 
@@ -254,12 +283,18 @@ destroyNimBLEDevice();
 
 wasConnected = true;
 
-xTaskCreate(gerarDados, "Task 1", 4000, NULL, 1, NULL); //Postar TASK 1 - GERAR DADOS
+if(compressedSensing){
+
+xTaskCreate(gerarDadoscomCS, "Task1", 4000, NULL, 1, NULL);  
+
+}else{
+ xTaskCreate(gerarDados, "Task 1", 4000, NULL, 1, NULL); 
+}
 
 
 }
 
-boolean canConnect = false;
+bool canConnect = false;
 
 void loop(){
 
