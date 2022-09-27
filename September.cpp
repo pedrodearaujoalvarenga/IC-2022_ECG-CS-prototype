@@ -210,9 +210,19 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 int looperI = 0;
 void gerarDados(void * parameters){ //Task1
   for( ;; ){
-    
- looperI++;
-leiturasESP32.push_back(looperI);
+  int ans;
+		if(digitalRead(40)==1||digitalRead(41)==1){
+			ans = 0;
+			
+			
+		}else{
+			
+			ans = analogRead(15);
+		}
+		
+		
+		
+leiturasESP32.push_back(ans);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
   }
 }
@@ -233,17 +243,27 @@ for( ; ;){
   }
   
 
-
 void gerarDadoscomCS(void* parameters){
 for(; ;){
     
 
     if(rand()%20 < probabilidadedeSerGerado){
-       looperI++;
-leiturasESP32.push_back(looperI);
+		
+		int ans;
+		if(digitalRead(40)==1||digitalRead(41)==1){
+			ans = 0;
+			
+			
+		}else{
+			
+			ans = analogRead(15);
+		}
+		
+		
+		
+leiturasESP32.push_back(ans);
 vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
     }else{
-		looperI++;
 		vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
 	}
 
