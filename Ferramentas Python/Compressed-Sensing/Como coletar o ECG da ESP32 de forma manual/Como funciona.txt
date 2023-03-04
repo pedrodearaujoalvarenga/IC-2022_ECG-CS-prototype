@@ -1,0 +1,4 @@
+Faça um script na ESP32 que printe as leituras do ECG separando com vírgulas. Ex: "431, 432, 456, 442, 446,". Precisa ter a última vírgula.
+Rode o script "Processador".
+Ele vai gerar um arquivo "ECG.npy".
+Este arquivo pode ser utilizado no outro arquivo de CS.

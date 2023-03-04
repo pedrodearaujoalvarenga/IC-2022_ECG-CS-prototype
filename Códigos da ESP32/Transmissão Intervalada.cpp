@@ -15,10 +15,10 @@
 //Definições para o usuário
 
 const int delay_BLE_ligado = 5000;     //Alterar a velocidade em que o BLE permanece ligado
-const int delay_BLE_desligado = 30000; //Alterar a velocidade em que o BLE permanece desligado
-int delay_geracao_Dados = 3;     //Alterar a velocidade com que os dados são gerados pela ESP
+const int delay_BLE_desligado = 100*1000; //Alterar a velocidade em que o BLE permanece desligado
+int delay_geracao_Dados = 10;     //Alterar a velocidade com que os dados são gerados pela ESP
 
-const int clockSlower = 20; //10 20 40 80 160 240
+const int clockSlower = 10; //10 20 40 80 160 240
 const int clockTurbo = 240; //80 160 240
 
 bool compressedSensing = false;
@@ -47,14 +47,14 @@ boolean wasConnected = true;
 
 class MyServerCallbacks: public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer) {
-           Serial.println("Connected");
+     NimBLEDevice::stopAdvertising();
      Connected = true;
      wasConnected = true;
      
      };
 
     void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
-                  Serial.println("Disconnected");
+      NimBLEDevice::startAdvertising();
       firstTime = true;
       Connected = false;
 };
@@ -63,14 +63,13 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 
 class MyServerCallbacksFirst: public NimBLEServerCallbacks{
       void onConnect(NimBLEServer* pServer) {
-      Serial.println("Connected");
+        NimBLEDevice::stopAdvertising();
    delay(1000);
      Connected = true;
      wasConnected = true;
      };
 
     void onDisconnect(NimBLEServer* pServer) {
-            Serial.println("Disconnected");
 
       Connected = false;
     
@@ -116,10 +115,6 @@ if(value.length()<2){
     compressedSensing = true;
     compressedRatio = valoresColetadosdaSequencia[2];
     probabilidadedeSerGerado = 20 - compressedRatio;
-    
-    Serial.println("Compressed Sensing habilitado, valores:");
-    Serial.println(compressedRatio);
-    Serial.println(probabilidadedeSerGerado);
   }
 
      canStart = true;
@@ -209,63 +204,57 @@ std::vector<int> leiturasESP32; //Vetor global onde é armazenado os dados da ES
 //looperI //<- Dado coletado da ESP32.
 int looperI = 0;
 void gerarDados(void * parameters){ //Task1
+
+TickType_t momentoDoInicio;
+  momentoDoInicio = xTaskGetTickCount();
+  
   for( ;; ){
   int ans;
-		if(digitalRead(40)==1||digitalRead(41)==1){
-			ans = 0;
-			
-			
-		}else{
-			
-			ans = analogRead(15);
-		}
-		
-		
-		
+    if(digitalRead(40)==1||digitalRead(41)==1){
+      ans = 0;
+      
+      
+    }else{
+      
+      ans = analogRead(15);
+    }
+    
+    
+    
 leiturasESP32.push_back(ans);
-vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
+
+vTaskDelayUntil(&momentoDoInicio,pdMS_TO_TICKS(delay_geracao_Dados));
   }
 }
-
-void gerenciamentoBLE(void * parameters){ //Task3
-for( ; ;){
-  if(!Connected){
-    destroyNimBLEDevice(); //destroy BLE Device
-    delay(delay_BLE_desligado);
-    createNimBLEDevice(); //Create BLE Device
-    
-    vTaskDelay(delay_BLE_ligado /portTICK_PERIOD_MS);
-  }else{
-
-    vTaskDelay(5 /portTICK_PERIOD_MS); //Esperar até ele se desconectar.
-  }
-  }
-  }
   
 
 void gerarDadoscomCS(void* parameters){
+
+  TickType_t momentoDoInicio;
+  momentoDoInicio = xTaskGetTickCount();
+  
 for(; ;){
     
 
     if(rand()%20 < probabilidadedeSerGerado){
-		
-		int ans;
-		if(digitalRead(40)==1||digitalRead(41)==1){
-			ans = 0;
-			
-			
-		}else{
-			
-			ans = analogRead(15);
-		}
-		
-		
-		
-leiturasESP32.push_back(ans);
-vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
+    
+    int ans;
+    if(digitalRead(40)==1||digitalRead(41)==1){
+      ans = 0;
+      
+      
     }else{
-		vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
-	}
+      
+      ans = analogRead(15);
+    }
+    
+    
+    
+leiturasESP32.push_back(ans);
+vTaskDelayUntil(&momentoDoInicio,pdMS_TO_TICKS(delay_geracao_Dados));
+    }else{
+vTaskDelayUntil(&momentoDoInicio,pdMS_TO_TICKS(delay_geracao_Dados));
+  }
 
   
 
@@ -280,17 +269,11 @@ vTaskDelay(delay_geracao_Dados /portTICK_PERIOD_MS);
 
 void setup(){
 
-  digitalWrite(LED_BUILTIN, HIGH);
-
-Serial.begin(115200);
-Serial.println("Vivo");
- Serial.println(ESP.getFreeHeap());
   setCpuFrequencyMhz(clockTurbo);
   WiFi.setSleep(true);
   analogReadResolution(10);
   
   pinMode(41, INPUT);
-  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(40, INPUT);
   
 createFirstNimBLEDevice();
@@ -332,11 +315,6 @@ if(canConnect){
   while(i<delay_BLE_ligado){
   
 if(Connected){
-  digitalWrite(LED_BUILTIN, HIGH);
-  Serial.begin(115200);
-  Serial.println("Conectado");
-   Serial.println(ESP.getFreeHeap());
-  
   if(firstTime){
       delay(2000);
       firstTime = false;
@@ -372,7 +350,6 @@ j++;
 firstTime = true;
 Connected = false;
 canConnect = false;
-digitalWrite(LED_BUILTIN, LOW);
   break;
 
 } 

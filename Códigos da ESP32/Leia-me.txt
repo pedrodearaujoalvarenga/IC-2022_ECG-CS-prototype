@@ -1,0 +1,49 @@
+1. Introdução
+
+
+Este documento se refere a como alterar as variáveis de funcionamento da ESP32.
+Inicialmente, a ESP32 foi desenvolvida como produto, note que ambos os aplicativos possuem função para alterar 
+praticamente todas as funções (clock, Compress Ratio, frequência). No entanto, pra fazer os experimentos de ciência,
+testes foram refeitos dezenas (provavelmente centenas). Toda vez que o aplicativo abre, ele reseta as configurações
+pra configuração "default", e isso estava me confundindo. Por isso, desvinculei a maioria dos controles que o 
+aplicativo possui e fiz de forma que é controlado diretamente pelo código Arduíno.
+
+Imagino que seja um dos objetivos de vocês fazer um aplicativo novo que transforme o projeto realmente num
+produto.
+
+
+2. Como alterar os dados da:
+
+2.1 Transmissão Intervalada
+
+
+O código da transmissão intervalada funciona com o aplicativo "September". Através do aplicativo, é possível alterar
+a Compress Ratio utilizada pela ESP32.
+
+
+Para alterar a frequência do ECG, substitua, nas linhas 254 e 256, onde está a int "delay_geracao_Dados" pelo número
+de millisegundos desejado. (3 = um dado a cada 3ms = 1000/3 = 333 Hz). Acredito também ser possível alterar 
+a frequência pelo aplicativo.
+Note que a ESP32 não consegue transmitir via BLE mais rápido do que 333 Hz.
+
+Para alterar os clocks que funcionam durante a rajada e durante a coleta de dados, mude o valor "clockSlower" e 
+"clockTurbo".
+
+Para alterar o intervalo entre as rajadas mude o primeiro número da multiplicação (insira diretamente em segundos e
+ele irá calcular em millisegundos).
+Por experimentação, adianto que o tempo máximo que a ESP32 pode permanecer coletando dados é de aproximadamente 10.000x
+o tempo da geração de dados. (10ms [100Hz] possui rajada máxima de 100s).
+Ela pode permanecer um pouco mais do que isso, mas a "sobra" foi garantido justamente pra não dar erro.
+
+
+2.2 Transmissão Contínua
+
+
+O código da transmissão contínua funciona com o aplicativo "June". Nenhuma das variáveis do aplicativo funcionam, é
+tudo definido por código. Para que este modo funcione, é preciso se conectar no modo "LEGACY".
+
+A velocidade do clock é definida pela variável clockSpeed. 
+A compressão é definida pela int compressRatio. Em "0" o Compressed Sensing está desligado.
+
+
+
