@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="MyAppBar" parent="@style/Widget.Design.AppBarLayout">
+        <item name="android:background">@color/dark</item>
+
+        ...
+    </style>
+
+    <style name="CircularDeterminateProgressBar">
+
+        <item name="android:progressDrawable">@drawable/ring</item>
+    </style>
+
+
+
+</resources>

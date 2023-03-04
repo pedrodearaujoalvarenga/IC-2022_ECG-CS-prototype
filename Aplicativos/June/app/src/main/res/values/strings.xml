@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">June</string>
+    <string name="connect">Connect</string>
+    <string name="connecting">Connecting</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="searching">Searching</string>
+    <string name="connection_failed">Failed</string>
+    <string name="not_found">ESP32 not found</string>
+    <string name="success">Success</string>
+    <string name="failure">Failure</string>
+    <string name="GPS">Check your GPS</string>
+    <string name="GPS_off">GPS OFF</string>
+    <string name="disconnection">Disconnection</string>
+
+
+</resources>
